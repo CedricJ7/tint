@@ -394,7 +394,6 @@ static void get_player_name()
 {
    // D'abord demander le nom à l'utilisateur
    getname(playername);
-   
 }
 
 static void err1 ()
@@ -753,7 +752,6 @@ int main (int argc,char *argv[])
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
 				  fprintf(logfile, "%s ACTION: Move LEFT from (x=%d, y=%d)\n", 
 				          timestamp_str, engine.curx, engine.cury);
-				  fprintf(logfile, "Action = left on shape(%d)\n", engine.curshape);
 				  engine_move (&engine,ACTION_LEFT);
 				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
 				          engine.curx, engine.cury);
@@ -764,7 +762,6 @@ int main (int argc,char *argv[])
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
 				  fprintf(logfile, "%s ACTION: ROTATE shape %d at (x=%d, y=%d)\n", 
 				          timestamp_str, engine.curshape, engine.curx, engine.cury);
-				  fprintf(logfile, "Action = rotate on shape(%d)\n", engine.curshape);
 				  engine_move (&engine,ACTION_ROTATE);
 				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
 				          engine.curx, engine.cury);
@@ -774,7 +771,6 @@ int main (int argc,char *argv[])
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
 				  fprintf(logfile, "%s ACTION: Move RIGHT from (x=%d, y=%d)\n", 
 				          timestamp_str, engine.curx, engine.cury);
-				  fprintf(logfile, "Action = right on shape(%d)\n", engine.curshape);
 				  engine_move (&engine,ACTION_RIGHT);
 				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
 				          engine.curx, engine.cury);
@@ -783,7 +779,6 @@ int main (int argc,char *argv[])
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
 				  fprintf(logfile, "%s ACTION: Move DOWN from (x=%d, y=%d)\n", 
 				          timestamp_str, engine.curx, engine.cury);
-				  fprintf(logfile, "Action = down on shape(%d)\n", engine.curshape);
 				  engine_move (&engine,ACTION_DOWN);
 				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
 				          engine.curx, engine.cury);
@@ -792,7 +787,6 @@ int main (int argc,char *argv[])
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
 				  fprintf(logfile, "%s ACTION: DROP shape %d from (x=%d, y=%d)\n", 
 				          timestamp_str, engine.curshape, engine.curx, engine.cury);
-				  fprintf(logfile, "Action = drop on shape(%d)\n", engine.curshape);
 				  engine_move (&engine,ACTION_DROP);
 				  fprintf(logfile, "Drop completed: final position (x=%d, y=%d)\n", 
 				          engine.curx, engine.cury);
