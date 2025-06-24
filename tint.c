@@ -61,16 +61,16 @@
 #define DELAY (1000000 / (level + 2))
 
 /* The score is multiplied by this to avoid losing precision */
-#define SCOREFACTOR 3
+#define SCOREFACTOR 2
 
 /* This calculates the stored score value */
 #define SCOREVAL(x) (SCOREFACTOR * (x))
 
-/* Length of a player's name */
-#define NAMELEN 20
-
 /* This calculates the real (displayed) value of the score */
 #define GETSCORE(score) ((score) / SCOREFACTOR)
+
+/* Length of a player's name */
+#define NAMELEN 20
 
 static bool shownext;
 static bool dottedlines;
@@ -78,7 +78,7 @@ static bool shadow;
 static bool newturn;
 static int level = MINLEVEL - 1,shapecount[NUMSHAPES], turn = 0;
 static char blockchar = ' ';
-static char playername[NAMELEN] = ""; // Ajouter une variable globale pour le nom du joueur
+static char playername[NAMELEN] = ""; // Variable globale pour le nom du joueur
 
 /*
  * Functions
@@ -92,7 +92,7 @@ static void get_timestamp_string(char *buffer, size_t buffer_size);
 static void score_function (engine_t *engine)
 {
    int score = SCOREVAL (level * (engine->status.dropcount + 1));
-   score += SCOREVAL ((level + 1000) * engine->status.currentdroppedlines * engine->status.currentdroppedlines);
+   score += SCOREVAL ((level + 10) * engine->status.currentdroppedlines * engine->status.currentdroppedlines);
 
    if (shownext) score /= 2;
    if (dottedlines) score /= 2;
@@ -116,7 +116,7 @@ static void drawboard (board_t board)
 			 out_setcolor (COLOR_BLUE,COLOR_BLACK);
 			 out_putch ('<');
 			 out_putch ('>');
-			 out_setattr (ATTR_OFF);
+			 out_setattr (ATTR_OFF);   
 			 break;
 			 /* Background */
 		   case 0:
@@ -197,10 +197,12 @@ static void showstatus (engine_t *engine)
    char tmp[MAXDIGITS + 1];
    char timestamp_str[32];
    int i,sum = getsum ();
+   
    out_setattr (ATTR_OFF);
    out_setcolor (COLOR_WHITE,COLOR_BLACK);
    out_gotoxy (1,YTOP + 1);   out_printf ("Your level: %d",level);
    out_gotoxy (1,YTOP + 2);   out_printf ("Full lines: %d",engine->status.droppedlines);
+   out_gotoxy (1,YTOP + 3);   out_printf ("curx : %d, cury :%d", engine->curx,engine->cury);
    out_gotoxy (2,YTOP + 4);   out_printf ("Score");
    out_setattr (ATTR_BOLD);
    out_setcolor (COLOR_YELLOW,COLOR_BLACK);
@@ -315,6 +317,7 @@ static void showstatus (engine_t *engine)
        fprintf(logfile, "%s Level = %d\n", timestamp_str, level);
        fprintf(logfile, "%s Score = %d\n", timestamp_str, GETSCORE (engine->score));
        fprintf(logfile, "%s Full lines = %d\n", timestamp_str, engine->status.droppedlines);
+       fprintf(logfile, "%s Current shape position: x=%d, y=%d\n", timestamp_str, engine->curx, engine->cury);
        fprintf(logfile, "%s STATISTICS\n", timestamp_str);
        fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[4], shapecount[shapenum[4]]);
        fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[3], shapecount[shapenum[3]]);
@@ -324,7 +327,7 @@ static void showstatus (engine_t *engine)
        fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[2], shapecount[shapenum[2]]);
        fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[1], shapecount[shapenum[1]]);
        fprintf(logfile, "%s Sum = %d\n", timestamp_str, sum);
-       fprintf(logfile, "%s Score ration = %d\n", timestamp_str, GETSCORE (engine->score) / sum);
+       fprintf(logfile, "%s Score ratio = %d\n", timestamp_str, GETSCORE (engine->score) / sum);
        fprintf(logfile, "%s Efficiency = %d\n", timestamp_str, engine->status.efficiency);
        newturn = FALSE;
    }
@@ -630,7 +633,7 @@ static bool evaluate (engine_t *engine)
             if ((level < MAXLEVEL) && ((engine->status.droppedlines / 10) > level)) level++;
             finished = TRUE;
             get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-            fprintf(logfile, "%s GAME FINISHED\n", timestamp_str);
+            fprintf(logfile, "%s GAME FINISHED at position x=%d, y=%d\n", timestamp_str, engine->curx, engine->cury);
         break;
             /* shape at bottom, next one released */
         case 0:
@@ -641,9 +644,9 @@ static bool evaluate (engine_t *engine)
             }
             shapecount[engine->curshape]++;
             get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-        fprintf(logfile, "%s Turn[%d] = Finished\n", timestamp_str, turn);
-        newturn = TRUE;
-        turn++;
+            fprintf(logfile, "%s Turn[%d] = Finished at position x=%d, y=%d\n", timestamp_str, turn, engine->curx, engine->cury);
+            newturn = TRUE;
+            turn++;
             break;
             /* shape moved down one line */
         case 1:
@@ -689,8 +692,8 @@ int main (int argc,char *argv[])
      {
          if (newturn) {
              get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-             fprintf(logfile, "%s Turn[%d] = Started\n", timestamp_str, turn);
-             fprintf(logfile, "%s shape(%d)\n", timestamp_str, engine.curshape);
+             fprintf(logfile, "%s Turn[%d] = Started at position x=%d, y=%d\n", timestamp_str, turn, engine.curx, engine.cury);
+             fprintf(logfile, "%s shape(%d) spawned at x=%d, y=%d\n", timestamp_str, engine.curshape, engine.curx, engine.cury);
         }
 		/* draw shape */
 		showstatus (&engine);
@@ -704,30 +707,44 @@ int main (int argc,char *argv[])
 				case 'j':
 				case KEY_LEFT:
 				  engine_move (&engine,ACTION_LEFT);
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Move LEFT to x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
 				  break;
 				case 'k':
 				case KEY_UP:
 				case '\n':
 				  engine_move (&engine,ACTION_ROTATE);
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s ROTATE at x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
 				  break;
 				case 'l':
 				case KEY_RIGHT:
 				  engine_move (&engine,ACTION_RIGHT);
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Move RIGHT to x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
 				  break;
 				case KEY_DOWN:
 				  engine_move (&engine,ACTION_DOWN);
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Move DOWN to x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
 				  break;
 				case ' ':
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s DROP from x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
 				  engine_move (&engine,ACTION_DROP);
 				  finished = evaluate(&engine);          /* prevent key press after drop */
 				  break;
 				  /* show next piece */
 				case 's':
 				  shownext = TRUE;
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Show next piece enabled\n", timestamp_str);
 				  break;
 				  /* toggle dotted lines */
 				case 'd':
 				  dottedlines = !dottedlines;
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Dotted lines toggled: %s\n", timestamp_str, dottedlines ? "ON" : "OFF");
 				  break;
 				  /* next level */
 				case 'a':
@@ -735,15 +752,21 @@ int main (int argc,char *argv[])
 					{
 					   level++;
 					   in_timeout (DELAY);
+					   get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+					   fprintf(logfile, "%s Level increased to %d\n", timestamp_str, level);
 					}
 				  else out_beep ();
 				  break;
 				  /* quit */
 				case 'q':
 				  finished = TRUE;
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Player quit game\n", timestamp_str);
 				  break;
 				  /* pause */
 				case 'p':
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Game paused\n", timestamp_str);
 				  out_setcolor (COLOR_WHITE,COLOR_BLACK);
 				  out_gotoxy ((out_width () - 34) / 2,out_height () - 2);
 				  out_printf ("Paused - Press any key to continue");
@@ -751,6 +774,8 @@ int main (int argc,char *argv[])
 				  in_flush ();							/* Clear keyboard buffer */
 				  out_gotoxy ((out_width () - 34) / 2,out_height () - 2);
 				  out_printf ("                                  ");
+				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+				  fprintf(logfile, "%s Game resumed\n", timestamp_str);
 				  break;
 				  /* unknown keypress */
 				default:
