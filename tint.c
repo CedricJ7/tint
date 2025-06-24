@@ -701,6 +701,11 @@ int main (int argc,char *argv[])
    
    /* Log game start info with proper format */
    get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+   struct timeval tv;
+   struct tm *tm_info;
+   gettimeofday(&tv, NULL);
+   tm_info = localtime(&tv.tv_sec);
+   fprintf(logfile, "ID :%s", tm_info);
    fprintf(logfile, "GAME STARTED at timestamp = %s\n", timestamp_str);
    fprintf(logfile, "Player name: %s\n", playername);
    fprintf(logfile, "Starting level: %d\n", level);
