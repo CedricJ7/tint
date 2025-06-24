@@ -46,6 +46,11 @@
  * Macros
  */
 
+// Ajouter après les includes et avant les autres macros
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 /* Upper left corner of board */
 #define XTOP ((out_width () - NUMROWS - 3) >> 1)
 #define YTOP ((out_height () - NUMCOLS - 9) >> 1)
@@ -87,7 +92,7 @@ static int scoressize = 0;
  */
 
 // Déclaration de la fonction get_timestamp_string
-#define TIMESTAMP_BUFFER_SIZE 32
+#define TIMESTAMP_BUFFER_SIZE 96
 
 static void get_timestamp_string(char *buffer, size_t buffer_size)
 {
@@ -497,7 +502,7 @@ static int cmpscores (const void *a,const void *b)
 static void savescores (int score)
 {
    FILE *handle;
-   int i,j,ch;
+   int i = 0, j = 0,ch;
    score_t *scores = malloc(scoressize * sizeof(score_t));
    if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
    time_t tmp = 0;
