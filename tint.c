@@ -448,6 +448,9 @@ static void createscores (int score)
 
    fprintf (stderr,"%s",scoretitle);
    fprintf (stderr,"\t  1* %7d        %s\n\n",score,scores[0].name);
+
+   free(scores);
+   scores = NULL;
 }
 
 static int cmpscores (const void *a,const void *b)
@@ -552,6 +555,9 @@ static void savescores (int score)
    fprintf(logfile, "%s Player timestamp = %ld\n", timestamp_str, scores[TOP_SCORES
    - 1].timestamp);
    fprintf(logfile, "%s ~~~~~~~~~~~~~~~~\n", timestamp_str);
+
+   free(scores);
+   scores = NULL;
 }
 
           /***************************************************************************/
