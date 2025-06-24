@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) Abraham vd Merwe <abz@blio.net>
  * All rights reserved.
@@ -52,7 +51,7 @@
 
 /* Maximum digits in a number (i.e. number of digits in score, */
 /* number of blocks, etc. should not exceed this value */
-#define MAXDIGITS 5
+#define MAXDIGITS 12
 
 /* Number of levels in the game */
 #define MINLEVEL	1
@@ -62,10 +61,13 @@
 #define DELAY (1000000 / (level + 2))
 
 /* The score is multiplied by this to avoid losing precision */
-#define SCOREFACTOR 2
+#define SCOREFACTOR 3
 
 /* This calculates the stored score value */
 #define SCOREVAL(x) (SCOREFACTOR * (x))
+
+/* Length of a player's name */
+#define NAMELEN 20
 
 /* This calculates the real (displayed) value of the score */
 #define GETSCORE(score) ((score) / SCOREFACTOR)
@@ -76,6 +78,7 @@ static bool shadow;
 static bool newturn;
 static int level = MINLEVEL - 1,shapecount[NUMSHAPES], turn = 0;
 static char blockchar = ' ';
+static char playername[NAMELEN] = ""; // Ajouter une variable globale pour le nom du joueur
 
 /*
  * Functions
@@ -86,7 +89,7 @@ static char blockchar = ' ';
 static void score_function (engine_t *engine)
 {
    int score = SCOREVAL (level * (engine->status.dropcount + 1));
-   score += SCOREVAL ((level + 10) * engine->status.currentdroppedlines * engine->status.currentdroppedlines);
+   score += SCOREVAL ((level + 1000) * engine->status.currentdroppedlines * engine->status.currentdroppedlines);
 
    if (shownext) score /= 2;
    if (dottedlines) score /= 2;
@@ -333,8 +336,6 @@ static void showstatus (engine_t *engine)
 /* Header for score title */
 static const char scoretitle[] = "\n\t   TINT HIGH SCORES\n\n\tRank   Score        Name\n\n";
 
-/* Length of a player's name */
-#define NAMELEN 20
 
 /* Number of scores allowed in highscore list */
 #define NUMSCORES 10
@@ -350,17 +351,23 @@ static void getname (char *name)
 {
    struct passwd *pw = getpwuid (geteuid ());
 
-   fprintf (stderr,"Congratulations! You have a new high score.\n");
    fprintf (stderr,"Enter your name [%s]: ",pw != NULL ? pw->pw_name : "");
 
    fgets (name,NAMELEN - 1,stdin);
    name[strlen (name) - 1] = '\0';
 
    if (!strlen (name) && pw != NULL)
-	 {
-		strncpy (name,pw->pw_name,NAMELEN);
-		name[NAMELEN - 1] = '\0';
-	 }
+     {
+        strncpy (name,pw->pw_name,NAMELEN);
+        name[NAMELEN - 1] = '\0';
+     }
+}
+
+// Nouvelle fonction pour demander le nom au début du jeu
+static void get_player_name ()
+{
+   getname(playername);
+   fprintf(stderr, "Welcome %s!\n", playername);
 }
 
 static void err1 ()
@@ -393,12 +400,13 @@ static void createscores (int score)
    char header[strlen (SCORE_HEADER)+1];
    if (score == 0) return;	/* No need saving this */
    for (i = 1; i < NUMSCORES; i++)
-	 {
-		strcpy (scores[i].name,"None");
-		scores[i].score = -1;
-		scores[i].timestamp = 0;
-	 }
-   getname (scores[0].name);
+     {
+        strcpy (scores[i].name,"None");
+        scores[i].score = -1;
+        scores[i].timestamp = 0;
+     }
+   // Utiliser le nom déjà saisi au lieu de le redemander
+   strcpy(scores[0].name, playername);
    scores[0].score = score;
    scores[0].timestamp = time (NULL);
    if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
@@ -406,14 +414,14 @@ static void createscores (int score)
    i = fwrite (header,strlen (SCORE_HEADER),1,handle);
    if (i != 1) err2 ();
    for (i = 0; i < NUMSCORES; i++)
-	 {
-		j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
-		if (j != 1) err2 ();
-		j = fwrite (&(scores[i].score),sizeof (int),1,handle);
-		if (j != 1) err2 ();
-		j = fwrite (&(scores[i].timestamp),sizeof (time_t),1,handle);
-		if (j != 1) err2 ();
-	 }
+     {
+        j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
+        if (j != 1) err2 ();
+        j = fwrite (&(scores[i].score),sizeof (int),1,handle);
+        if (j != 1) err2 ();
+        j = fwrite (&(scores[i].timestamp),sizeof (time_t),1,handle);
+        if (j != 1) err2 ();
+     }
    fclose (handle);
 
    fprintf (stderr,"%s",scoretitle);
@@ -446,74 +454,73 @@ static void savescores (int score)
    char header[strlen (SCORE_HEADER)+1];
    time_t tmp = 0;
    if ((handle = fopen (scorefile,"r")) == NULL)
-	 {
-		createscores (score);
-		return;
-	 }
+     {
+        createscores (score);
+        return;
+     }
    i = fread (header,strlen (SCORE_HEADER),1,handle);
    if ((i != 1) || (strncmp (SCORE_HEADER,header,strlen (SCORE_HEADER)) != 0))
-	 {
-		createscores (score);
-		return;
-	 }
+     {
+        createscores (score);
+        return;
+     }
    for (i = 0; i < NUMSCORES; i++)
-	 {
-		j = 0;
-		while ((ch = fgetc (handle)) != '\0')
-		  {
-			 if ((ch == EOF) || (j >= NAMELEN - 2))
-			   {
-				  createscores (score);
-				  return;
-			   }
-			 scores[i].name[j++] = (char) ch;
-		  }
-		scores[i].name[j] = '\0';
-		j = fread (&(scores[i].score),sizeof (int),1,handle);
-		if (j != 1)
-		  {
-			 createscores (score);
-			 return;
-		  }
-		j = fread (&(scores[i].timestamp),sizeof (time_t),1,handle);
-		if (j != 1)
-		  {
-			 createscores (score);
-			 return;
-		  }
-	 }
+     {
+        j = 0;
+        while ((ch = fgetc (handle)) != '\0')
+          {
+             if ((ch == EOF) || (j >= NAMELEN - 2))
+               {
+                  createscores (score);
+                  return;
+               }
+             scores[i].name[j++] = (char) ch;
+          }
+        scores[i].name[j] = '\0';
+        j = fread (&(scores[i].score),sizeof (int),1,handle);
+        if (j != 1)
+          {
+             createscores (score);
+             return;
+          }
+        j = fread (&(scores[i].timestamp),sizeof (time_t),1,handle);
+        if (j != 1)
+          {
+             createscores (score);
+             return;
+          }
+     }
    fclose (handle);
 
-   if (score > scores[NUMSCORES - 1].score)
-	 {
-		getname (scores[NUMSCORES - 1].name);
-		scores[NUMSCORES - 1].score = score;
-		scores[NUMSCORES - 1].timestamp = tmp = time (NULL);
-	 }
+   // Utiliser le nom déjà saisi au lieu de le redemander
+   strcpy(scores[NUMSCORES - 1].name, playername);
+   scores[NUMSCORES - 1].score = score;
+   scores[NUMSCORES - 1].timestamp = tmp = time (NULL);
+
    qsort (scores,NUMSCORES,sizeof (score_t),cmpscores);
    if ((handle = fopen (scorefile,"w")) == NULL) err2 ();
    strcpy (header,SCORE_HEADER);
    i = fwrite (header,strlen (SCORE_HEADER),1,handle);
    if (i != 1) err2 ();
    for (i = 0; i < NUMSCORES; i++)
-	 {
-		j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
-		if (j != 1) err2 ();
-		j = fwrite (&(scores[i].score),sizeof (int),1,handle);
-		if (j != 1) err2 ();
-		j = fwrite (&(scores[i].timestamp),sizeof (time_t),1,handle);
-		if (j != 1) err2 ();
-	 }
+     {
+        j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
+        if (j != 1) err2 ();
+        j = fwrite (&(scores[i].score),sizeof (int),1,handle);
+        if (j != 1) err2 ();
+        j = fwrite (&(scores[i].timestamp),sizeof (time_t),1,handle);
+        if (j != 1) err2 ();
+     }
    fclose (handle);
 
    fprintf (stderr,"%s",scoretitle);
    i = 0;
    while ((i < NUMSCORES) && (scores[i].score != -1))
-	 {
-		j = scores[i].timestamp == tmp ? '*' : ' ';
-		fprintf (stderr,"\t %2d%c %7d        %s\n",i + 1,j,scores[i].score,scores[i].name);
-		i++;
-	 }
+     {
+        j = scores[i].timestamp == tmp ? '*' : ' ';
+        fprintf (stderr,"\t %2d%c %7d        %s\n",i + 1,j,scores[i].score,scores[i].name);
+        i++;
+     }
    fprintf (stderr,"\n");
 
    /* LOG */
@@ -633,6 +640,10 @@ int main (int argc,char *argv[])
    bool finished;
    int ch;
    engine_t engine;
+   
+   /* Demander le nom du joueur en premier */
+   get_player_name();
+   
    /* Initialize */
    newturn = TRUE;
    rand_init ();							/* must be called before engine_init () */
@@ -646,6 +657,8 @@ int main (int argc,char *argv[])
    io_init ();
    /* Open log file */
    openlogfile();
+   /* Log du nom du joueur */
+   fprintf(logfile, "Player name: %s\n", playername);
    drawbackground ();
    in_timeout (DELAY);
    /* Main loop */
