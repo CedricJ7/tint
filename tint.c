@@ -79,6 +79,9 @@ static bool newturn;
 static int level = MINLEVEL - 1,shapecount[NUMSHAPES], turn = 0;
 static char blockchar = ' ';
 static char playername[NAMELEN] = ""; // Variable globale pour le nom du joueur
+static char playerlist[100][NAMELEN]; // Liste des joueurs
+static int playerlistsize = 0;
+static int scoressize = 0;
 
 /*
  * Functions
@@ -346,7 +349,7 @@ static const char scoretitle[] = "\n\t   TINT HIGH SCORES\n\n\tRank   Score     
 
 
 /* Number of scores allowed in highscore list */
-#define NUMSCORES 10
+#define TOP_SCORES 10
 
 typedef struct
 {
@@ -382,10 +385,19 @@ static void get_timestamp_string(char *buffer, size_t buffer_size)
 // Nouvelle fonction pour demander le nom au début du jeu
 static void get_player_name ()
 {
-   getname(playername);
-   fprintf(stderr, "Welcome %s!\n", playername);
-   
-   // Ne pas logger ici car logfile n'est pas encore ouvert
+  for (int i = 0; i < sizeof(playerlistsize); i++) 
+    {
+      if (strcmp(playerlist[i], playername) == 0) 
+        {
+          fprint ("This username already exist");
+        }
+      else 
+        {
+          strcpy(playerlist[playerlistsize++], playername);
+          getname(playername);
+          fprintf(stderr, "Welcome %s!\n", playername);
+        }
+    }
 }
 
 static void err1 ()
@@ -414,24 +426,22 @@ static void createscores (int score)
 {
    FILE *handle;
    int i,j;
-   score_t scores[NUMSCORES];
-   char header[strlen (SCORE_HEADER)+1];
+   score_t *scores = malloc(scoressize * sizeof(score_t));
+   if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
    if (score == 0) return;	/* No need saving this */
-   for (i = 1; i < NUMSCORES; i++)
+   for (i = 1; i < scoressize; i++)
      {
         strcpy (scores[i].name,"None");
         scores[i].score = -1;
         scores[i].timestamp = 0;
      }
    // Utiliser le nom déjà saisi au lieu de le redemander
-   strcpy(scores[0].name, playername);
-   scores[0].score = score;
-   scores[0].timestamp = time (NULL);
+   strcpy(scores[scoressize - 1].name, playername);
+   scores[scoressize - 1].score = score;
+   scores[scoressize - 1].timestamp = time(NULL);
    if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
-   strcpy (header,SCORE_HEADER);
-   i = fwrite (header,strlen (SCORE_HEADER),1,handle);
    if (i != 1) err2 ();
-   for (i = 0; i < NUMSCORES; i++)
+   for (i = 0; i < scoressize; i++)
      {
         j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
         if (j != 1) err2 ();
@@ -468,22 +478,20 @@ static void savescores (int score)
 {
    FILE *handle;
    int i,j,ch;
-   score_t scores[NUMSCORES];
-   char header[strlen (SCORE_HEADER)+1];
-   char timestamp_str[32];
+   score_t *scores = malloc(scoressize * sizeof(score_t));
+   if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
    time_t tmp = 0;
    if ((handle = fopen (scorefile,"r")) == NULL)
      {
         createscores (score);
         return;
      }
-   i = fread (header,strlen (SCORE_HEADER),1,handle);
-   if ((i != 1) || (strncmp (SCORE_HEADER,header,strlen (SCORE_HEADER)) != 0))
+   if (i != 1)
      {
         createscores (score);
         return;
      }
-   for (i = 0; i < NUMSCORES; i++)
+   for (i = 0; i < scoressize; i++)
      {
         j = 0;
         while ((ch = fgetc (handle)) != '\0')
@@ -512,16 +520,13 @@ static void savescores (int score)
    fclose (handle);
 
    // Utiliser le nom déjà saisi au lieu de le redemander
-   strcpy(scores[NUMSCORES - 1].name, playername);
-   scores[NUMSCORES - 1].score = score;
-   scores[NUMSCORES - 1].timestamp = tmp = time (NULL);
-
-   qsort (scores,NUMSCORES,sizeof (score_t),cmpscores);
+   strcpy(scores[scoressize - 1].name, playername);
+   scores[scoressize - 1].score = score;
+   scores[scoressize - 1].timestamp = tmp = time (NULL);
+     
    if ((handle = fopen (scorefile,"w")) == NULL) err2 ();
-   strcpy (header,SCORE_HEADER);
-   i = fwrite (header,strlen (SCORE_HEADER),1,handle);
    if (i != 1) err2 ();
-   for (i = 0; i < NUMSCORES; i++)
+   for (i = 0; i < scoressize; i++)
      {
         j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
         if (j != 1) err2 ();
@@ -534,7 +539,7 @@ static void savescores (int score)
 
    fprintf (stderr,"%s",scoretitle);
    i = 0;
-   while ((i < NUMSCORES) && (scores[i].score != -1))
+   while ((i < scoressize) && (scores[i].score != -1))
      {
         j = scores[i].timestamp == tmp ? '*' : ' ';
         fprintf (stderr,"\t %2d%c %7d        %s\n",i + 1,j,scores[i].score,scores[i].name);
@@ -545,9 +550,12 @@ static void savescores (int score)
    /* LOG */
    get_timestamp_string(timestamp_str, sizeof(timestamp_str));
    fprintf(logfile, "%s ~~ FINAL SCORE ~~\n", timestamp_str);
-   fprintf(logfile, "%s Player name = %s\n", timestamp_str, scores[NUMSCORES - 1].name);
-   fprintf(logfile, "%s Player score = %7d\n", timestamp_str, scores[NUMSCORES - 1].score);
-   fprintf(logfile, "%s Player timestamp = %ld\n", timestamp_str, scores[NUMSCORES - 1].timestamp);
+   fprintf(logfile, "%s Player name = %s\n", timestamp_str, scores[TOP_SCORES
+   - 1].name);
+   fprintf(logfile, "%s Player score = %7d\n", timestamp_str, scores[TOP_SCORES
+   - 1].score);
+   fprintf(logfile, "%s Player timestamp = %ld\n", timestamp_str, scores[TOP_SCORES
+   - 1].timestamp);
    fprintf(logfile, "%s ~~~~~~~~~~~~~~~~\n", timestamp_str);
 }
 
