@@ -395,21 +395,6 @@ static void get_player_name()
    // D'abord demander le nom à l'utilisateur
    getname(playername);
    
-   // Vérifier si le nom existe déjà dans la liste
-   for (int i = 0; i < playerlistsize; i++) 
-   {
-      if (strcmp(playerlist[i], playername) == 0) 
-      {
-         fprintf(stderr, "This username already exists\n");
-         return;
-      }
-   }
-   
-   // Ajouter le nom à la liste si c'est un nouveau joueur
-   if (playerlistsize < 100) {
-      strcpy(playerlist[playerlistsize++], playername);
-      fprintf(stderr, "Welcome %s!\n", playername);
-   }
 }
 
 static void err1 ()
