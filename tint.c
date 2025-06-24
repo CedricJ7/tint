@@ -87,7 +87,22 @@ static int scoressize = 0;
  */
 
 // Déclaration de la fonction get_timestamp_string
-static void get_timestamp_string(char *buffer, size_t buffer_size);
+#define TIMESTAMP_BUFFER_SIZE 32
+
+static void get_timestamp_string(char *buffer, size_t buffer_size)
+{
+   if (buffer == NULL || buffer_size < 16) return; // Sécurité
+   
+   struct timeval tv;
+   struct tm *tm_info;
+   
+   gettimeofday(&tv, NULL);
+   tm_info = localtime(&tv.tv_sec);
+   
+   snprintf(buffer, buffer_size, "%04d-%02d-%02d %02d:%02d:%02d.%03ld",
+            tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
+            tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, tv.tv_usec / 1000);
+}
 
 /* This function is responsible for increasing the score appropriately whenever
  * a block collides at the bottom of the screen (or the top of the heap */
@@ -107,10 +122,12 @@ static void drawboard (board_t board)
 {
    int x,y;
    out_setattr (ATTR_OFF);
-   for (y = 1; y < NUMROWS - 1; y++) for (x = 0; x < NUMCOLS - 1; x++)
-	 {
-		out_gotoxy (XTOP + x * 2,YTOP + y);
-		switch (board[x][y])
+   for (y = 1; y < NUMROWS - 1; y++) {
+      for (x = 0; x < NUMCOLS - 1; x++) {
+         // Vérifier les limites avant d'accéder au tableau
+         if (x >= 0 && x < NUMCOLS && y >= 0 && y < NUMROWS) {
+            out_gotoxy (XTOP + x * 2,YTOP + y);
+            switch (board[x][y])
 		  {
 			 /* Wall */
 		   case WALL:
@@ -141,7 +158,9 @@ static void drawboard (board_t board)
 			 out_putch (blockchar);
 			 out_putch (blockchar);
 		  }
-	 }
+         }
+      }
+   }
    out_setattr (ATTR_OFF);
 }
 
@@ -296,13 +315,17 @@ static void showstatus (engine_t *engine)
    out_gotoxy (out_width () - MAXDIGITS - 17,YTOP + 18);
    out_printf ("Sum          :");
    snprintf (tmp,MAXDIGITS + 1,"%d",sum);
-   out_gotoxy (out_width () - strlen (tmp) - 1,YTOP + 18);
-   out_printf ("%s",tmp);
+   out_gotoxy (out_width () - MIN(strlen(tmp), MAXDIGITS) - 1, YTOP + 18);
+   out_printf ("%s", tmp);
    out_gotoxy (out_width () - MAXDIGITS - 17,YTOP + 20);
    for (i = 0; i < MAXDIGITS + 16; i++) out_putch (' ');
    out_gotoxy (out_width () - MAXDIGITS - 17,YTOP + 20);
    out_printf ("Score ratio  :");
-   snprintf (tmp,MAXDIGITS + 1,"%d",GETSCORE (engine->score) / sum);
+   if (sum > 0) {
+      snprintf(tmp, MAXDIGITS + 1, "%d", GETSCORE (engine->score) / sum);
+   } else {
+      snprintf(tmp, MAXDIGITS + 1, "N/A");
+   }
    out_gotoxy (out_width () - strlen (tmp) - 1,YTOP + 20);
    out_printf ("%s",tmp);
    out_gotoxy (out_width () - MAXDIGITS - 17,YTOP + 21);
@@ -359,32 +382,23 @@ typedef struct
 
 static void getname (char *name)
 {
-   struct passwd *pw = getpwuid (geteuid ());
+   struct passwd *pw = getpwuid(geteuid());
 
-   fprintf (stderr,"Enter your name [%s]: ",pw != NULL ? pw->pw_name : "");
+   fprintf(stderr, "Enter your name [%s]: ", pw != NULL ? pw->pw_name : "");
 
-   fgets (name,NAMELEN - 1,stdin);
-   name[strlen (name) - 1] = '\0';
+   if (fgets(name, NAMELEN - 1, stdin) != NULL) {
+      size_t len = strlen(name);
+      if (len > 0) {
+         name[len - 1] = '\0'; // Enlève le caractère de nouvelle ligne en toute sécurité
+      }
+   } else {
+      name[0] = '\0'; // En cas d'erreur de lecture
+   }
 
-   if (!strlen (name) && pw != NULL)
-     {
-        strncpy (name,pw->pw_name,NAMELEN);
-        name[NAMELEN - 1] = '\0';
-     }
-}
-
-// Update the timestamp function to use real calendar time with proper formatting
-static void get_timestamp_string(char *buffer, size_t buffer_size)
-{
-   struct timeval tv;
-   struct tm *tm_info;
-   
-   gettimeofday(&tv, NULL);
-   tm_info = localtime(&tv.tv_sec);
-   
-   snprintf(buffer, buffer_size, "%04d-%02d-%02d %02d:%02d:%02d.%03ld",
-            tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
-            tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, tv.tv_usec / 1000);
+   if (!strlen(name) && pw != NULL) {
+      strncpy(name, pw->pw_name, NAMELEN - 1);
+      name[NAMELEN - 1] = '\0'; // Garantit la terminaison
+   }
 }
 
 // Fonction pour demander le nom au début du jeu
@@ -420,6 +434,10 @@ static void createscores (int score)
 {
    FILE *handle;
    int i,j;
+   
+   // Vérification que scoressize est valide
+   if (scoressize <= 0) scoressize = TOP_SCORES;
+   
    score_t *scores = malloc(scoressize * sizeof(score_t));
    if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
    if (score == 0) return;	/* No need saving this */
@@ -432,9 +450,9 @@ static void createscores (int score)
    // Utiliser le nom déjà saisi au lieu de le redemander
    if (scoressize > 0) 
    {
-    strcpy(scores[scoressize - 1].name, playername);
-    scores[scoressize - 1].score = score;
-    scores[scoressize - 1].timestamp = time(NULL);
+      strcpy(scores[scoressize - 1].name, playername);
+      scores[scoressize - 1].score = score;
+      scores[scoressize - 1].timestamp = time(NULL);
 
    if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
    if (i != 1) err2 ();
@@ -722,15 +740,14 @@ int main (int argc,char *argv[])
   struct tm *tm_info = localtime(&tv.tv_sec);
   
   // Format as YYYYMMDDHHMMSSMMM (year, month, day, hour, minute, second, milliseconds)
-  unsigned long game_id = (unsigned long)(tm_info->tm_year + 1900) * 10000000000000UL +
-                  (tm_info->tm_mon + 1) * 100000000000UL +
-                  tm_info->tm_mday * 1000000000UL +
-                  tm_info->tm_hour * 10000000UL +
-                  tm_info->tm_min * 100000UL +
-                  tm_info->tm_sec * 1000UL +
-                  tv.tv_usec / 1000UL;
-  
-  fprintf(logfile, "Game ID: %lu\n", game_id);
+  unsigned long long game_id = (unsigned long long)(tm_info->tm_year + 1900) * 10000000000ULL +
+                  (tm_info->tm_mon + 1) * 100000000ULL +
+                  tm_info->tm_mday * 1000000ULL +
+                  tm_info->tm_hour * 10000ULL +
+                  tm_info->tm_min * 100ULL +
+                  tm_info->tm_sec;
+
+  fprintf(logfile, "Game ID: %llu\n", game_id);
    fprintf(logfile, "GAME STARTED at timestamp = %s\n", timestamp_str);
    fprintf(logfile, "Player name: %s\n", playername);
    fprintf(logfile, "Starting level: %d\n", level);
