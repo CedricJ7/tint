@@ -430,9 +430,12 @@ static void createscores (int score)
         scores[i].timestamp = 0;
      }
    // Utiliser le nom déjà saisi au lieu de le redemander
-   strcpy(scores[scoressize - 1].name, playername);
-   scores[scoressize - 1].score = score;
-   scores[scoressize - 1].timestamp = time(NULL);
+   if (sizeof(scores[scoressize]) > 1) 
+   {
+    strcpy(scores[scoressize - 1].name, playername);
+    scores[scoressize - 1].score = score;
+    scores[scoressize - 1].timestamp = time(NULL);
+   }
    if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
    if (i != 1) err2 ();
    for (i = 0; i < scoressize; i++)
@@ -518,9 +521,12 @@ static void savescores (int score)
    fclose (handle);
 
    // Utiliser le nom déjà saisi au lieu de le redemander
-   strcpy(scores[scoressize - 1].name, playername);
-   scores[scoressize - 1].score = score;
-   scores[scoressize - 1].timestamp = tmp = time (NULL);
+   if (sizeof(scores[scoressize]) > 1) 
+   {
+    strcpy(scores[scoressize - 1].name, playername);
+    scores[scoressize - 1].score = score;
+    scores[scoressize - 1].timestamp = time(NULL);
+   }
      
    if ((handle = fopen (scorefile,"w")) == NULL) err2 ();
    if (i != 1) err2 ();
