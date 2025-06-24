@@ -40,6 +40,7 @@
 #include "io.h"
 #include "config.h"
 #include "engine.h"
+#include "log.h"
 
 /*
  * Macros
@@ -72,7 +73,8 @@
 static bool shownext;
 static bool dottedlines;
 static bool shadow;
-static int level = MINLEVEL - 1,shapecount[NUMSHAPES];
+static bool newturn;
+static int level = MINLEVEL - 1,shapecount[NUMSHAPES], turn = 0;
 static char blockchar = ' ';
 
 /*
@@ -299,6 +301,26 @@ static void showstatus (engine_t *engine)
    snprintf (tmp,MAXDIGITS + 1,"%d",engine->status.efficiency);
    out_gotoxy (out_width () - strlen (tmp) - 1,YTOP + 21);
    out_printf ("%s",tmp);
+
+   if (newturn)
+   {
+	   fprintf(logfile, "Level = %d\n", level);
+	   fprintf(logfile, "Score = %d\n", GETSCORE (engine->score));
+	   fprintf(logfile, "Full lines = %d\n", engine->status.droppedlines);
+	   fprintf(logfile, "STATISTICS\n");
+	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[4], shapecount[shapenum[4]]);
+	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[3], shapecount[shapenum[3]]);
+	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[6], shapecount[shapenum[6]]);
+	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[5], shapecount[shapenum[5]]);
+	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[0], shapecount[shapenum[0]]);
+	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[2], shapecount[shapenum[2]]);
+	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[1], shapecount[shapenum[1]]);
+	   fprintf(logfile, "Sum = %d\n", sum);
+	   fprintf(logfile, "Score ration = %d\n", GETSCORE (engine->score) / sum);
+	   fprintf(logfile, "Efficiency = %d\n", engine->status.efficiency);
+	   newturn = FALSE;
+   }
+
 }
 
           /***************************************************************************/
@@ -461,6 +483,7 @@ static void savescores (int score)
 		  }
 	 }
    fclose (handle);
+
    if (score > scores[NUMSCORES - 1].score)
 	 {
 		getname (scores[NUMSCORES - 1].name);
@@ -492,6 +515,13 @@ static void savescores (int score)
 		i++;
 	 }
    fprintf (stderr,"\n");
+
+   /* LOG */
+   fprintf(logfile, "~~ FINAL SCORE ~~\n");
+   fprintf(logfile, "Player name = %s\n", scores[NUMSCORES - 1].name);
+   fprintf(logfile, "Player score = %7d\n", scores[NUMSCORES - 1].score);
+   fprintf(logfile, "Player timestamp = %ld\n", scores[NUMSCORES - 1].timestamp);
+   fprintf(logfile, "~~~~~~~~~~~~~~~~\n");
 }
 
           /***************************************************************************/
@@ -573,7 +603,8 @@ static bool evaluate (engine_t *engine)
         case -1:
             if ((level < MAXLEVEL) && ((engine->status.droppedlines / 10) > level)) level++;
             finished = TRUE;
-            break;
+            fprintf(logfile, "GAME FINISHED\n");
+	    break;
             /* shape at bottom, next one released */
         case 0:
             if ((level < MAXLEVEL) && ((engine->status.droppedlines / 10) > level))
@@ -582,10 +613,13 @@ static bool evaluate (engine_t *engine)
                 in_timeout (DELAY);
             }
             shapecount[engine->curshape]++;
+	    fprintf(logfile, "Turn[%d] = Finished\n", turn);
+	    newturn = TRUE;
+	    turn++;
             break;
             /* shape moved down one line */
         case 1:
-            break;
+		break;
     }
     return finished;
 }
@@ -600,6 +634,7 @@ int main (int argc,char *argv[])
    int ch;
    engine_t engine;
    /* Initialize */
+   newturn = TRUE;
    rand_init ();							/* must be called before engine_init () */
    engine_init (&engine,score_function);	/* must be called before using engine.curshape */
    finished = shownext = shadow = FALSE;
@@ -609,11 +644,17 @@ int main (int argc,char *argv[])
    engine.shadow = shadow;
    if (level < MINLEVEL) choose_level ();
    io_init ();
+   /* Open log file */
+   openlogfile();
    drawbackground ();
    in_timeout (DELAY);
    /* Main loop */
    do
 	 {
+		 if (newturn) {
+			 fprintf(logfile, "Turn[%d] = Started\n", turn);
+			 fprintf(logfile, "shape(%d)\n", engine.curshape);
+		}
 		/* draw shape */
 		showstatus (&engine);
 		drawboard (engine.board);
@@ -692,6 +733,7 @@ int main (int argc,char *argv[])
 		showplayerstats (&engine);
 		savescores (GETSCORE (engine.score));
 	 }
+   closelogfile();
    exit (EXIT_SUCCESS);
 }
 

@@ -34,10 +34,14 @@
 #include "utils.h"
 #include "io.h"
 #include "engine.h"
+#include "log.h"
 
 /*
  * Global variables
  */
+static const char *ACTIONS_STRING[] = {
+	"left", "rotate", "right", "drop", "down"
+};
 
 const shapes_t SHAPES =
 {
@@ -355,6 +359,7 @@ void engine_move (engine_t *engine,action_t action)
 	  case ACTION_DROP:
 		engine->status.dropcount += shape_drop (engine);
 	 }
+   fprintf(logfile, "Action = %s on shape(%d)\n", ACTIONS_STRING[action], engine->curshape);
 }
 
 /*

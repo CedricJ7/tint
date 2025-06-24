@@ -46,7 +46,7 @@ CFLAGS += -Wall
 CPPFLAGS = -DSCOREFILE=\"$(localstatedir)/$(PRG).scores\" #-DUSE_RAND
 LDLIBS = -lncurses
 
-OBJ = engine.o utils.o io.o tint.o
+OBJ = engine.o utils.o io.o log.o tint.o
 SRC = $(OBJ:%.o=%.c)
 PRG = tint
 
