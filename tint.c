@@ -701,11 +701,21 @@ int main (int argc,char *argv[])
    
    /* Log game start info with proper format */
    get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-   struct timeval tv;
-   struct tm *tm_info;
-   gettimeofday(&tv, NULL);
-   tm_info = localtime(&tv.tv_sec);
-   fprintf(logfile, "ID :%s", tm_info);
+  // Create a unique game ID based on timestamp
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  struct tm *tm_info = localtime(&tv.tv_sec);
+  
+  // Format as YYYYMMDDHHMMSSMMM (year, month, day, hour, minute, second, milliseconds)
+  unsigned long game_id = (unsigned long)(tm_info->tm_year + 1900) * 10000000000000UL +
+                  (tm_info->tm_mon + 1) * 100000000000UL +
+                  tm_info->tm_mday * 1000000000UL +
+                  tm_info->tm_hour * 10000000UL +
+                  tm_info->tm_min * 100000UL +
+                  tm_info->tm_sec * 1000UL +
+                  tv.tv_usec / 1000UL;
+  
+  fprintf(logfile, "Game ID: %lu\n", game_id);
    fprintf(logfile, "GAME STARTED at timestamp = %s\n", timestamp_str);
    fprintf(logfile, "Player name: %s\n", playername);
    fprintf(logfile, "Starting level: %d\n", level);
