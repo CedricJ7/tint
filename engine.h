@@ -14,7 +14,7 @@
  *	  notice, this list of conditions and the following disclaimer in the
  *	  documentation and/or other materials provided with the distribution.
  * 3. Neither the name of the author nor the names of other contributors
- *	  may be used to endorse or promote products derived from this software
+ *	  may be used to endorse or promote products derived from this     
  *	  without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -42,8 +42,8 @@
 #define NUMBLOCKS	4
 
 /* Number of rows and columns in board */
-#define NUMROWS	25
-#define NUMCOLS	14
+#define NUMROWS	35
+#define NUMCOLS	20
 
 /* Wall id - Arbitrary, but shouldn't have the same value as one of the colors */
 #define WALL 16

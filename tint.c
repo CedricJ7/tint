@@ -84,6 +84,9 @@ static char playername[NAMELEN] = ""; // Ajouter une variable globale pour le no
  * Functions
  */
 
+// Déclaration de la fonction get_timestamp_string
+static void get_timestamp_string(char *buffer, size_t buffer_size);
+
 /* This function is responsible for increasing the score appropriately whenever
  * a block collides at the bottom of the screen (or the top of the heap */
 static void score_function (engine_t *engine)
@@ -192,6 +195,7 @@ static void showstatus (engine_t *engine)
 {
    static const int shapenum[NUMSHAPES] = { 4, 6, 5, 1, 0, 3, 2 };
    char tmp[MAXDIGITS + 1];
+   char timestamp_str[32];
    int i,sum = getsum ();
    out_setattr (ATTR_OFF);
    out_setcolor (COLOR_WHITE,COLOR_BLACK);
@@ -307,21 +311,22 @@ static void showstatus (engine_t *engine)
 
    if (newturn)
    {
-	   fprintf(logfile, "Level = %d\n", level);
-	   fprintf(logfile, "Score = %d\n", GETSCORE (engine->score));
-	   fprintf(logfile, "Full lines = %d\n", engine->status.droppedlines);
-	   fprintf(logfile, "STATISTICS\n");
-	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[4], shapecount[shapenum[4]]);
-	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[3], shapecount[shapenum[3]]);
-	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[6], shapecount[shapenum[6]]);
-	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[5], shapecount[shapenum[5]]);
-	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[0], shapecount[shapenum[0]]);
-	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[2], shapecount[shapenum[2]]);
-	   fprintf(logfile, "Shape(%d) = %d\n", shapenum[1], shapecount[shapenum[1]]);
-	   fprintf(logfile, "Sum = %d\n", sum);
-	   fprintf(logfile, "Score ration = %d\n", GETSCORE (engine->score) / sum);
-	   fprintf(logfile, "Efficiency = %d\n", engine->status.efficiency);
-	   newturn = FALSE;
+       get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+       fprintf(logfile, "%s Level = %d\n", timestamp_str, level);
+       fprintf(logfile, "%s Score = %d\n", timestamp_str, GETSCORE (engine->score));
+       fprintf(logfile, "%s Full lines = %d\n", timestamp_str, engine->status.droppedlines);
+       fprintf(logfile, "%s STATISTICS\n", timestamp_str);
+       fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[4], shapecount[shapenum[4]]);
+       fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[3], shapecount[shapenum[3]]);
+       fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[6], shapecount[shapenum[6]]);
+       fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[5], shapecount[shapenum[5]]);
+       fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[0], shapecount[shapenum[0]]);
+       fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[2], shapecount[shapenum[2]]);
+       fprintf(logfile, "%s Shape(%d) = %d\n", timestamp_str, shapenum[1], shapecount[shapenum[1]]);
+       fprintf(logfile, "%s Sum = %d\n", timestamp_str, sum);
+       fprintf(logfile, "%s Score ration = %d\n", timestamp_str, GETSCORE (engine->score) / sum);
+       fprintf(logfile, "%s Efficiency = %d\n", timestamp_str, engine->status.efficiency);
+       newturn = FALSE;
    }
 
 }
@@ -363,11 +368,21 @@ static void getname (char *name)
      }
 }
 
+// Nouvelle fonction pour obtenir un timestamp formaté
+static void get_timestamp_string(char *buffer, size_t buffer_size)
+{
+   struct timespec timestamp;
+   clock_gettime(CLOCK_MONOTONIC, &timestamp);
+   snprintf(buffer, buffer_size, "[%ld.%09ld]", timestamp.tv_sec, timestamp.tv_nsec);
+}
+
 // Nouvelle fonction pour demander le nom au début du jeu
 static void get_player_name ()
 {
    getname(playername);
    fprintf(stderr, "Welcome %s!\n", playername);
+   
+   // Ne pas logger ici car logfile n'est pas encore ouvert
 }
 
 static void err1 ()
@@ -452,6 +467,7 @@ static void savescores (int score)
    int i,j,ch;
    score_t scores[NUMSCORES];
    char header[strlen (SCORE_HEADER)+1];
+   char timestamp_str[32];
    time_t tmp = 0;
    if ((handle = fopen (scorefile,"r")) == NULL)
      {
@@ -524,11 +540,12 @@ static void savescores (int score)
    fprintf (stderr,"\n");
 
    /* LOG */
-   fprintf(logfile, "~~ FINAL SCORE ~~\n");
-   fprintf(logfile, "Player name = %s\n", scores[NUMSCORES - 1].name);
-   fprintf(logfile, "Player score = %7d\n", scores[NUMSCORES - 1].score);
-   fprintf(logfile, "Player timestamp = %ld\n", scores[NUMSCORES - 1].timestamp);
-   fprintf(logfile, "~~~~~~~~~~~~~~~~\n");
+   get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+   fprintf(logfile, "%s ~~ FINAL SCORE ~~\n", timestamp_str);
+   fprintf(logfile, "%s Player name = %s\n", timestamp_str, scores[NUMSCORES - 1].name);
+   fprintf(logfile, "%s Player score = %7d\n", timestamp_str, scores[NUMSCORES - 1].score);
+   fprintf(logfile, "%s Player timestamp = %ld\n", timestamp_str, scores[NUMSCORES - 1].timestamp);
+   fprintf(logfile, "%s ~~~~~~~~~~~~~~~~\n", timestamp_str);
 }
 
           /***************************************************************************/
@@ -604,14 +621,17 @@ static void choose_level ()
 static bool evaluate (engine_t *engine)
 {
     bool finished = FALSE;
+    char timestamp_str[32];
+    
     switch (engine_evaluate (engine))
     {
         /* game over (board full) */
         case -1:
             if ((level < MAXLEVEL) && ((engine->status.droppedlines / 10) > level)) level++;
             finished = TRUE;
-            fprintf(logfile, "GAME FINISHED\n");
-	    break;
+            get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+            fprintf(logfile, "%s GAME FINISHED\n", timestamp_str);
+        break;
             /* shape at bottom, next one released */
         case 0:
             if ((level < MAXLEVEL) && ((engine->status.droppedlines / 10) > level))
@@ -620,13 +640,14 @@ static bool evaluate (engine_t *engine)
                 in_timeout (DELAY);
             }
             shapecount[engine->curshape]++;
-	    fprintf(logfile, "Turn[%d] = Finished\n", turn);
-	    newturn = TRUE;
-	    turn++;
+            get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+        fprintf(logfile, "%s Turn[%d] = Finished\n", timestamp_str, turn);
+        newturn = TRUE;
+        turn++;
             break;
             /* shape moved down one line */
         case 1:
-		break;
+        break;
     }
     return finished;
 }
@@ -640,6 +661,7 @@ int main (int argc,char *argv[])
    bool finished;
    int ch;
    engine_t engine;
+   char timestamp_str[32];
    
    /* Demander le nom du joueur en premier */
    get_player_name();
@@ -657,17 +679,19 @@ int main (int argc,char *argv[])
    io_init ();
    /* Open log file */
    openlogfile();
-   /* Log du nom du joueur */
-   fprintf(logfile, "Player name: %s\n", playername);
+   /* Log du nom du joueur APRÈS avoir ouvert le fichier de log */
+   get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+   fprintf(logfile, "%s Player name: %s\n", timestamp_str, playername);
    drawbackground ();
    in_timeout (DELAY);
    /* Main loop */
    do
-	 {
-		 if (newturn) {
-			 fprintf(logfile, "Turn[%d] = Started\n", turn);
-			 fprintf(logfile, "shape(%d)\n", engine.curshape);
-		}
+     {
+         if (newturn) {
+             get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+             fprintf(logfile, "%s Turn[%d] = Started\n", timestamp_str, turn);
+             fprintf(logfile, "%s shape(%d)\n", timestamp_str, engine.curshape);
+        }
 		/* draw shape */
 		showstatus (&engine);
 		drawboard (engine.board);
