@@ -80,8 +80,6 @@ static bool newturn;
 static int level = MINLEVEL - 1,shapecount[NUMSHAPES], turn = 0;
 static char blockchar = ' ';
 static char playername[NAMELEN] = ""; // Variable globale pour le nom du joueur
-static char playerlist[100][NAMELEN]; // Liste des joueurs
-static int playerlistsize = 0;
 static int scoressize = 0;
 
 /*
