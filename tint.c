@@ -430,12 +430,12 @@ static void createscores (int score)
         scores[i].timestamp = 0;
      }
    // Utiliser le nom déjà saisi au lieu de le redemander
-   if (sizeof(scores[scoressize]) > 1) 
+   if (scoressize > 0) 
    {
     strcpy(scores[scoressize - 1].name, playername);
     scores[scoressize - 1].score = score;
     scores[scoressize - 1].timestamp = time(NULL);
-   }
+
    if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
    if (i != 1) err2 ();
    for (i = 0; i < scoressize; i++)
@@ -448,10 +448,12 @@ static void createscores (int score)
         if (j != 1) err2 ();
      }
    fclose (handle);
-
+   }
    fprintf (stderr,"%s",scoretitle);
    fprintf (stderr,"\t  1* %7d        %s\n\n",score,scores[0].name);
-
+  
+   scoressize ++;
+   
    free(scores);
    scores = NULL;
 }
@@ -521,12 +523,11 @@ static void savescores (int score)
    fclose (handle);
 
    // Utiliser le nom déjà saisi au lieu de le redemander
-   if (sizeof(scores[scoressize]) > 1) 
+   if (scoressize > 0) 
    {
     strcpy(scores[scoressize - 1].name, playername);
     scores[scoressize - 1].score = score;
     scores[scoressize - 1].timestamp = time(NULL);
-   }
      
    if ((handle = fopen (scorefile,"w")) == NULL) err2 ();
    if (i != 1) err2 ();
@@ -561,6 +562,8 @@ static void savescores (int score)
    fprintf(logfile, "%s Player timestamp = %ld\n", timestamp_str, scores[TOP_SCORES
    - 1].timestamp);
    fprintf(logfile, "%s ~~~~~~~~~~~~~~~~\n", timestamp_str);
+
+   }
 
    free(scores);
    scores = NULL;
