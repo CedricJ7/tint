@@ -42,8 +42,8 @@
 #define NUMBLOCKS	4
 
 /* Number of rows and columns in board */
-#define NUMROWS	35
-#define NUMCOLS	20
+#define NUMROWS	25
+#define NUMCOLS	15
 
 /* Wall id - Arbitrary, but shouldn't have the same value as one of the colors */
 #define WALL 16

@@ -32,6 +32,7 @@
 #include <time.h>
 #include <pwd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "typedefs.h"
@@ -374,30 +375,41 @@ static void getname (char *name)
      }
 }
 
-// Nouvelle fonction pour obtenir un timestamp formaté
+// Update the timestamp function to use real calendar time with proper formatting
 static void get_timestamp_string(char *buffer, size_t buffer_size)
 {
-   struct timespec timestamp;
-   clock_gettime(CLOCK_MONOTONIC, &timestamp);
-   snprintf(buffer, buffer_size, "[%ld.%09ld]", timestamp.tv_sec, timestamp.tv_nsec);
+   struct timeval tv;
+   struct tm *tm_info;
+   
+   gettimeofday(&tv, NULL);
+   tm_info = localtime(&tv.tv_sec);
+   
+   snprintf(buffer, buffer_size, "%04d-%02d-%02d %02d:%02d:%02d.%03ld",
+            tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
+            tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, tv.tv_usec / 1000);
 }
 
-// Nouvelle fonction pour demander le nom au début du jeu
-static void get_player_name ()
+// Fonction pour demander le nom au début du jeu
+static void get_player_name()
 {
-  for (int i = 0; i < sizeof(playerlistsize); i++) 
-    {
+   // D'abord demander le nom à l'utilisateur
+   getname(playername);
+   
+   // Vérifier si le nom existe déjà dans la liste
+   for (int i = 0; i < playerlistsize; i++) 
+   {
       if (strcmp(playerlist[i], playername) == 0) 
-        {
-          fprint ("This username already exist");
-        }
-      else 
-        {
-          strcpy(playerlist[playerlistsize++], playername);
-          getname(playername);
-          fprintf(stderr, "Welcome %s!\n", playername);
-        }
-    }
+      {
+         fprintf(stderr, "This username already exists\n");
+         return;
+      }
+   }
+   
+   // Ajouter le nom à la liste si c'est un nouveau joueur
+   if (playerlistsize < 100) {
+      strcpy(playerlist[playerlistsize++], playername);
+      fprintf(stderr, "Welcome %s!\n", playername);
+   }
 }
 
 static void err1 ()
@@ -481,6 +493,7 @@ static void savescores (int score)
    score_t *scores = malloc(scoressize * sizeof(score_t));
    if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
    time_t tmp = 0;
+   char timestamp_str[32];
    if ((handle = fopen (scorefile,"r")) == NULL)
      {
         createscores (score);
@@ -641,7 +654,9 @@ static bool evaluate (engine_t *engine)
             if ((level < MAXLEVEL) && ((engine->status.droppedlines / 10) > level)) level++;
             finished = TRUE;
             get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-            fprintf(logfile, "%s GAME FINISHED at position x=%d, y=%d\n", timestamp_str, engine->curx, engine->cury);
+            fprintf(logfile, "%s GAME FINISHED at position: shape %d at (x=%d, y=%d)\n", 
+                    timestamp_str, engine->curshape, engine->curx, engine->cury);
+            fprintf(logfile, "%s Cause: Board full (game over)\n", timestamp_str);
         break;
             /* shape at bottom, next one released */
         case 0:
@@ -652,12 +667,23 @@ static bool evaluate (engine_t *engine)
             }
             shapecount[engine->curshape]++;
             get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-            fprintf(logfile, "%s Turn[%d] = Finished at position x=%d, y=%d\n", timestamp_str, turn, engine->curx, engine->cury);
+            fprintf(logfile, "%s Shape %d landed at final position (x=%d, y=%d)\n", 
+                    timestamp_str, engine->curshape, engine->curx, engine->cury);
+            
+            if (engine->status.currentdroppedlines > 0) {
+                fprintf(logfile, "%s Lines cleared: %d lines\n", timestamp_str, 
+                        engine->status.currentdroppedlines);
+            }
+            
+            fprintf(logfile, "%s Turn[%d] = Finished\n", timestamp_str, turn);
             newturn = TRUE;
             turn++;
             break;
             /* shape moved down one line */
         case 1:
+            get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+            fprintf(logfile, "%s Shape %d moved down to (x=%d, y=%d)\n", 
+                    timestamp_str, engine->curshape, engine->curx, engine->cury);
         break;
     }
     return finished;
@@ -690,9 +716,16 @@ int main (int argc,char *argv[])
    io_init ();
    /* Open log file */
    openlogfile();
-   /* Log du nom du joueur APRÈS avoir ouvert le fichier de log */
+   
+   /* Log game start info with proper format */
    get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-   fprintf(logfile, "%s Player name: %s\n", timestamp_str, playername);
+   fprintf(logfile, "GAME STARTED at timestamp = %s\n", timestamp_str);
+   fprintf(logfile, "Player name: %s\n", playername);
+   fprintf(logfile, "Starting level: %d\n", level);
+   fprintf(logfile, "Game options: shownext=%s, dottedlines=%s, shadow=%s\n", 
+           shownext ? "true" : "false", dottedlines ? "true" : "false", shadow ? "true" : "false");
+   fprintf(logfile, "Block character: '%c'\n", blockchar);
+   
    drawbackground ();
    in_timeout (DELAY);
    /* Main loop */
@@ -700,8 +733,26 @@ int main (int argc,char *argv[])
      {
          if (newturn) {
              get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-             fprintf(logfile, "%s Turn[%d] = Started at position x=%d, y=%d\n", timestamp_str, turn, engine.curx, engine.cury);
-             fprintf(logfile, "%s shape(%d) spawned at x=%d, y=%d\n", timestamp_str, engine.curshape, engine.curx, engine.cury);
+             fprintf(logfile, "Turn[%d] = Started\n", turn);
+             fprintf(logfile, "New shape(%d) spawned at (x=%d, y=%d)\n", 
+                     engine.curshape, engine.curx, engine.cury);
+             fprintf(logfile, "Turn[%d] timestamp = %s\n", turn, timestamp_str);
+             fprintf(logfile, "Level = %d\n", level);
+             fprintf(logfile, "Score = %d\n", GETSCORE (engine.score));
+             fprintf(logfile, "Full lines = %d\n", engine.status.droppedlines);
+             fprintf(logfile, "Current shape = %d at position (x=%d, y=%d)\n", 
+                     engine.curshape, engine.curx, engine.cury);
+             fprintf(logfile, "Next shape = %d\n", engine.nextshape);
+             fprintf(logfile, "Drop count this turn = %d\n", engine.status.dropcount);
+             fprintf(logfile, "Lines dropped this turn = %d\n", engine.status.currentdroppedlines);
+             fprintf(logfile, "STATISTICS\n");
+             for (int i = 0; i < NUMSHAPES; i++) {
+                 fprintf(logfile, "Shape(%d) = %d\n", i, shapecount[i]);
+             }
+             fprintf(logfile, "Sum = %d\n", getsum());
+             fprintf(logfile, "Score ratio = %d\n", GETSCORE (engine.score) / getsum());
+             fprintf(logfile, "Efficiency = %d\n", engine.status.efficiency);
+             newturn = FALSE;
         }
 		/* draw shape */
 		showstatus (&engine);
@@ -714,45 +765,66 @@ int main (int argc,char *argv[])
 			   {
 				case 'j':
 				case KEY_LEFT:
-				  engine_move (&engine,ACTION_LEFT);
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-				  fprintf(logfile, "%s Move LEFT to x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "%s ACTION: Move LEFT from (x=%d, y=%d)\n", 
+				          timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "Action = left on shape(%d)\n", engine.curshape);
+				  engine_move (&engine,ACTION_LEFT);
+				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
+				          engine.curx, engine.cury);
 				  break;
 				case 'k':
 				case KEY_UP:
 				case '\n':
-				  engine_move (&engine,ACTION_ROTATE);
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-				  fprintf(logfile, "%s ROTATE at x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "%s ACTION: ROTATE shape %d at (x=%d, y=%d)\n", 
+				          timestamp_str, engine.curshape, engine.curx, engine.cury);
+				  fprintf(logfile, "Action = rotate on shape(%d)\n", engine.curshape);
+				  engine_move (&engine,ACTION_ROTATE);
+				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
+				          engine.curx, engine.cury);
 				  break;
 				case 'l':
 				case KEY_RIGHT:
-				  engine_move (&engine,ACTION_RIGHT);
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-				  fprintf(logfile, "%s Move RIGHT to x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "%s ACTION: Move RIGHT from (x=%d, y=%d)\n", 
+				          timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "Action = right on shape(%d)\n", engine.curshape);
+				  engine_move (&engine,ACTION_RIGHT);
+				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
+				          engine.curx, engine.cury);
 				  break;
 				case KEY_DOWN:
-				  engine_move (&engine,ACTION_DOWN);
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-				  fprintf(logfile, "%s Move DOWN to x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "%s ACTION: Move DOWN from (x=%d, y=%d)\n", 
+				          timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "Action = down on shape(%d)\n", engine.curshape);
+				  engine_move (&engine,ACTION_DOWN);
+				  fprintf(logfile, "Result: shape now at (x=%d, y=%d)\n", 
+				          engine.curx, engine.cury);
 				  break;
 				case ' ':
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-				  fprintf(logfile, "%s DROP from x=%d, y=%d\n", timestamp_str, engine.curx, engine.cury);
+				  fprintf(logfile, "%s ACTION: DROP shape %d from (x=%d, y=%d)\n", 
+				          timestamp_str, engine.curshape, engine.curx, engine.cury);
+				  fprintf(logfile, "Action = drop on shape(%d)\n", engine.curshape);
 				  engine_move (&engine,ACTION_DROP);
+				  fprintf(logfile, "Drop completed: final position (x=%d, y=%d)\n", 
+				          engine.curx, engine.cury);
 				  finished = evaluate(&engine);          /* prevent key press after drop */
 				  break;
 				  /* show next piece */
 				case 's':
-				  shownext = TRUE;
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
 				  fprintf(logfile, "%s Show next piece enabled\n", timestamp_str);
+				  shownext = TRUE;
 				  break;
 				  /* toggle dotted lines */
 				case 'd':
 				  dottedlines = !dottedlines;
 				  get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-				  fprintf(logfile, "%s Dotted lines toggled: %s\n", timestamp_str, dottedlines ? "ON" : "OFF");
+				  fprintf(logfile, "%s Dotted lines toggled: %s\n", timestamp_str, 
+				          dottedlines ? "ON" : "OFF");
 				  break;
 				  /* next level */
 				case 'a':
@@ -797,6 +869,16 @@ int main (int argc,char *argv[])
    while (!finished);
    /* Restore console settings and exit */
    io_close ();
+   
+   /* Log game end information */
+   get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+   fprintf(logfile, "GAME FINISHED at timestamp = %s\n", timestamp_str);
+   fprintf(logfile, "Final position: shape %d at (x=%d, y=%d)\n", 
+           engine.curshape, engine.curx, engine.cury);
+   if (ch == 'q') {
+       fprintf(logfile, "Cause: Player quit\n");
+   }
+   
    /* Don't bother the player if he want's to quit */
    if (ch != 'q')
 	 {

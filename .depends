@@ -1,0 +1,5 @@
+engine.o: engine.c typedefs.h utils.h io.h engine.h log.h
+utils.o: utils.c typedefs.h
+io.o: io.c io.h
+log.o: log.c
+tint.o: tint.c typedefs.h utils.h io.h config.h engine.h log.h
