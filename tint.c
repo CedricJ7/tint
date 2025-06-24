@@ -221,7 +221,7 @@ static void showstatus (engine_t *engine)
 {
    static const int shapenum[NUMSHAPES] = { 4, 6, 5, 1, 0, 3, 2 };
    char tmp[MAXDIGITS + 1];
-   char timestamp_str[32];
+   char timestamp_str[TIMESTAMP_BUFFER_SIZE];
    int i,sum = getsum ();
    
    out_setattr (ATTR_OFF);
@@ -455,12 +455,12 @@ static void createscores (int score)
    // Utiliser le nom déjà saisi au lieu de le redemander
    if (scoressize > 0) 
    {
-      strcpy(scores[scoressize - 1].name, playername);
+      strncpy(scores[scoressize - 1].name, playername, NAMELEN - 1);
+      scores[scoressize - 1].name[NAMELEN - 1] = '\0'; // Assurer la terminaison par caractère nul
       scores[scoressize - 1].score = score;
       scores[scoressize - 1].timestamp = time(NULL);
 
    if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
-   if (i != 1) err2 ();
    for (i = 0; i < scoressize; i++)
      {
         j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
@@ -506,7 +506,7 @@ static void savescores (int score)
    score_t *scores = malloc(scoressize * sizeof(score_t));
    if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
    time_t tmp = 0;
-   char timestamp_str[32];
+   char timestamp_str[TIMESTAMP_BUFFER_SIZE];
    if ((handle = fopen (scorefile,"r")) == NULL)
      {
         createscores (score);
@@ -548,12 +548,12 @@ static void savescores (int score)
    // Utiliser le nom déjà saisi au lieu de le redemander
    if (scoressize > 0) 
    {
-    strcpy(scores[scoressize - 1].name, playername);
+    strncpy(scores[scoressize - 1].name, playername, NAMELEN - 1);
+    scores[scoressize - 1].name[NAMELEN - 1] = '\0'; // Garantir la terminaison par caractère nul
     scores[scoressize - 1].score = score;
     scores[scoressize - 1].timestamp = time(NULL);
      
    if ((handle = fopen (scorefile,"w")) == NULL) err2 ();
-   if (i != 1) err2 ();
    for (i = 0; i < scoressize; i++)
      {
         j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
@@ -665,7 +665,7 @@ static void choose_level ()
 static bool evaluate (engine_t *engine)
 {
     bool finished = FALSE;
-    char timestamp_str[32];
+    char timestamp_str[TIMESTAMP_BUFFER_SIZE];
     
     switch (engine_evaluate (engine))
     {
@@ -718,7 +718,7 @@ int main (int argc,char *argv[])
    bool finished;
    int ch;
    engine_t engine;
-   char timestamp_str[32];
+   char timestamp_str[TIMESTAMP_BUFFER_SIZE];
    
    /* Demander le nom du joueur en premier */
    get_player_name();
@@ -917,4 +917,3 @@ int main (int argc,char *argv[])
    closelogfile();
    exit (EXIT_SUCCESS);
 }
-
