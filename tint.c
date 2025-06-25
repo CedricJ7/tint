@@ -372,7 +372,7 @@ static void showstatus (engine_t *engine)
 #define SCORE_HEADER	"Tint 0.02b (c) Abraham vd Merwe - Scores"
 
 /* Header for score title */
-static const char scoretitle[] = "\n\t   TINT HIGH SCORES\n\n\tRank   Score        Name\n\n";
+static const char scoretitle[] = "\n\t   TINT TOP SCORES\n\n\tRank   Score        Name\n\n";
 
 
 /* Number of scores allowed in highscore list */
@@ -516,7 +516,7 @@ static void savescores(int score)
     // Garde les TOP_SCORES meilleurs
     int count = total > TOP_SCORES ? TOP_SCORES : total;
 
-    // Réécrit tout le fichier
+    // Réécrit tout le fichier avec les anciens scores
     handle = fopen(scorefile, "wb");
     if (!handle) {
         fprintf(stderr, "Erreur ouverture fichier écriture\n");
