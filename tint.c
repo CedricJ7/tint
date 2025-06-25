@@ -555,7 +555,7 @@ static void savescores(int score)
     scores[scoressize - 1].timestamp = newtime;
 
     // Write everything back
-    handle = fopen(scorefile, "wb");
+    handle = fopen(scorefile, "rb");
     if (!handle) err2();
 
     for (i = 0; i < scoressize; i++) {
@@ -587,8 +587,9 @@ static void savescores(int score)
 
 void show_top_scores() {
     FILE *handle;
-    int i = 0, j = 0, ch;
+    int i, j, ch;
     long filesize;
+    const int MAX_TOP = 10;
     int entry_size = NAMELEN + sizeof(int) + sizeof(time_t);
     score_t *scores = NULL;
     int total_scores = 0;
@@ -599,12 +600,13 @@ void show_top_scores() {
         return;
     }
 
+    // Calcul du nombre d'entrées
     fseek(handle, 0, SEEK_END);
     filesize = ftell(handle);
     rewind(handle);
-
     total_scores = filesize / entry_size;
-    if (total_scores == 0) {
+
+    if (total_scores <= 0) {
         fprintf(stderr, "Fichier de scores vide.\n");
         fclose(handle);
         return;
@@ -617,38 +619,44 @@ void show_top_scores() {
         return;
     }
 
+    // Lecture des scores
     for (i = 0; i < total_scores; i++) {
-        j = 0;
-        while ((ch = fgetc(handle)) != '\0') {
-            if ((ch == EOF) || (j >= NAMELEN - 1)) {
-                fprintf(stderr, "Fichier corrompu.\n");
-                free(scores);
-                fclose(handle);
-                return;
-            }
-            scores[i].name[j++] = (char) ch;
+        j = fread(scores[i].name, 1, NAMELEN, handle);
+        if (j != NAMELEN || strchr(scores[i].name, '\0') == NULL) {
+            fprintf(stderr, "Fichier corrompu (nom).\n");
+            free(scores);
+            fclose(handle);
+            return;
         }
-        scores[i].name[j] = '\0';
-        fread(&scores[i].score, sizeof(int), 1, handle);
-        fread(&scores[i].timestamp, sizeof(time_t), 1, handle);
+
+        if (fread(&scores[i].score, sizeof(int), 1, handle) != 1 ||
+            fread(&scores[i].timestamp, sizeof(time_t), 1, handle) != 1) {
+            fprintf(stderr, "Fichier corrompu (score/timestamp).\n");
+            free(scores);
+            fclose(handle);
+            return;
+        }
     }
 
     fclose(handle);
 
+    // Tri du tableau
     qsort(scores, total_scores, sizeof(score_t), cmpscores);
 
-    int top = total_scores < 10 ? total_scores : 10;
-    fprintf(stderr, "\n==== TOP %d SCORES ====\n", top);
+    // Affichage des 10 meilleurs scores
+    int top = total_scores < MAX_TOP ? total_scores : MAX_TOP;
+    fprintf(stderr, "\n====== MEILLEURS SCORES ======\n");
     for (i = 0; i < top; i++) {
-        fprintf(stderr, "%2d. %7d pts  -  %s\n", i + 1, scores[i].score, scores[i].name);
+        struct tm *tm_info = localtime(&scores[i].timestamp);
+        char datebuf[20];
+        strftime(datebuf, sizeof(datebuf), "%Y-%m-%d", tm_info);
+        fprintf(stderr, "%2d. %7d pts  -  %-*s (%s)\n",
+                i + 1, scores[i].score, NAMELEN - 1, scores[i].name, datebuf);
     }
-    fprintf(stderr, "=======================\n\n");
+    fprintf(stderr, "==============================\n\n");
 
     free(scores);
 }
-
-
-
 
           /***************************************************************************/
           /***************************************************************************/
