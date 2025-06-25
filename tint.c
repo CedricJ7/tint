@@ -551,79 +551,6 @@ static void savescores(int score)
     free(scores);
 }
 
-void show_top_scores() {
-    FILE *handle;
-    int i, j, ch;
-    long filesize;
-    const int MAX_TOP = 10;
-    int entry_size = NAMELEN + sizeof(int) + sizeof(time_t);
-    score_t *scores = NULL;
-    int total_scores = 0;
-
-    handle = fopen(scorefile, "rb");
-    if (!handle) {
-        fprintf(stderr, "Aucun fichier de scores trouvé.\n");
-        return;
-    }
-
-    // Calcul du nombre d'entrées
-    fseek(handle, 0, SEEK_END);
-    filesize = ftell(handle);
-    rewind(handle);
-    total_scores = filesize / entry_size;
-
-    if (total_scores <= 0) {
-        fprintf(stderr, "Fichier de scores vide.\n");
-        fclose(handle);
-        return;
-    }
-
-    scores = malloc(total_scores * sizeof(score_t));
-    if (!scores) {
-        fprintf(stderr, "Erreur d'allocation mémoire.\n");
-        fclose(handle);
-        return;
-    }
-
-    // Lecture des scores
-    for (i = 0; i < total_scores; i++) {
-        j = fread(scores[i].name, 1, NAMELEN, handle);
-        if (j != NAMELEN || strchr(scores[i].name, '\0') == NULL) {
-            fprintf(stderr, "Fichier corrompu (nom).\n");
-            free(scores);
-            fclose(handle);
-            return;
-        }
-
-        if (fread(&scores[i].score, sizeof(int), 1, handle) != 1 ||
-            fread(&scores[i].timestamp, sizeof(time_t), 1, handle) != 1) {
-            fprintf(stderr, "Fichier corrompu (score/timestamp).\n");
-            free(scores);
-            fclose(handle);
-            return;
-        }
-    }
-
-    fclose(handle);
-
-    // Tri du tableau
-    qsort(scores, total_scores, sizeof(score_t), cmpscores);
-
-    // Affichage des 10 meilleurs scores
-    int top = total_scores < MAX_TOP ? total_scores : MAX_TOP;
-    fprintf(stderr, "\n====== MEILLEURS SCORES ======\n");
-    for (i = 0; i < top; i++) {
-        struct tm *tm_info = localtime(&scores[i].timestamp);
-        char datebuf[20];
-        strftime(datebuf, sizeof(datebuf), "%Y-%m-%d", tm_info);
-        fprintf(stderr, "%2d. %7d pts  -  %-*s (%s)\n",
-                i + 1, scores[i].score, NAMELEN - 1, scores[i].name, datebuf);
-    }
-    fprintf(stderr, "==============================\n\n");
-
-    free(scores);
-}
-
           /***************************************************************************/
           /***************************************************************************/
           /***************************************************************************/
@@ -945,7 +872,6 @@ int main (int argc,char *argv[])
 	 {
 		showplayerstats (&engine);
 		savescores (GETSCORE (engine.score));
-    show_top_scores();
 	 }
    closelogfile();
    exit (EXIT_SUCCESS);
