@@ -435,52 +435,6 @@ void showplayerstats (engine_t *engine)
 			GETSCORE (engine->score),engine->status.efficiency,GETSCORE (engine->score) / getsum ());
 }
 
-static void createscores (int score)
-{
-   FILE *handle;
-   int i,j;
-   
-   // Vérification que scoressize est valide
-   if (scoressize <= 0) scoressize = TOP_SCORES;
-   
-   score_t *scores = malloc(scoressize * sizeof(score_t));
-   if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
-   if (score == 0) return;	/* No need saving this */
-   for (i = 1; i < scoressize; i++)
-     {
-        strcpy (scores[i].name,"None");
-        scores[i].score = -1;
-        scores[i].timestamp = 0;
-     }
-   // Utiliser le nom déjà saisi au lieu de le redemander
-   if (scoressize > 0) 
-   {
-      strncpy(scores[scoressize - 1].name, playername, NAMELEN - 1);
-      scores[scoressize - 1].name[NAMELEN - 1] = '\0'; // Assurer la terminaison par caractère nul
-      scores[scoressize - 1].score = score;
-      scores[scoressize - 1].timestamp = time(NULL);
-
-   if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
-   for (i = 0; i < scoressize; i++)
-     {
-        j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
-        if (j != 1) err2 ();
-        j = fwrite (&(scores[i].score),sizeof (int),1,handle);
-        if (j != 1) err2 ();
-        j = fwrite (&(scores[i].timestamp),sizeof (time_t),1,handle);
-        if (j != 1) err2 ();
-     }
-   fclose (handle);
-   }
-   fprintf (stderr,"%s",scoretitle);
-   fprintf (stderr,"\t  1* %7d        %s\n\n",score,scores[0].name);
-  
-   scoressize ++;
-   
-   free(scores);
-   scores = NULL;
-}
-
 static int cmpscores (const void *a,const void *b)
 {
    int result;
@@ -499,98 +453,153 @@ static int cmpscores (const void *a,const void *b)
    return 0;
 }
 
-static void savescores (int score)
+static void savescores(int score)
 {
-   FILE *handle;
-   int i = 0, j = 0,ch;
-   score_t *scores = malloc(scoressize * sizeof(score_t));
-   if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
-   time_t tmp = 0;
-   char timestamp_str[TIMESTAMP_BUFFER_SIZE];
-   if ((handle = fopen (scorefile,"r")) == NULL)
-     {
-        createscores (score);
-        return;
-     }
-   if (i != 1)
-     {
-        createscores (score);
-        return;
-     }
-   for (i = 0; i < scoressize; i++)
-     {
-        j = 0;
-        while ((ch = fgetc (handle)) != '\0')
-          {
-             if ((ch == EOF) || (j >= NAMELEN - 2))
-               {
-                  createscores (score);
-                  return;
-               }
-             scores[i].name[j++] = (char) ch;
-          }
-        scores[i].name[j] = '\0';
-        j = fread (&(scores[i].score),sizeof (int),1,handle);
-        if (j != 1)
-          {
-             createscores (score);
-             return;
-          }
-        j = fread (&(scores[i].timestamp),sizeof (time_t),1,handle);
-        if (j != 1)
-          {
-             createscores (score);
-             return;
-          }
-     }
-   fclose (handle);
+    FILE *handle;
+    int i = 0, j = 0, ch;
+    time_t newtime = time(NULL);
+    char timestamp_str[TIMESTAMP_BUFFER_SIZE];
 
-   // Utiliser le nom déjà saisi au lieu de le redemander
-   if (scoressize > 0) 
-   {
+    if (score == 0) return;
+
+    // Open existing file (if it exists)
+    handle = fopen(scorefile, "rb");
+    int entry_size = NAMELEN + sizeof(int) + sizeof(time_t);
+    int existing_scores = 0;
+
+    score_t *scores = NULL;
+
+    if (handle) {
+        fseek(handle, 0, SEEK_END);
+        long filesize = ftell(handle);
+        rewind(handle);
+
+        existing_scores = filesize / entry_size;
+        scoressize = existing_scores + 1;
+
+        scores = malloc(scoressize * sizeof(score_t));
+        if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
+
+        for (i = 0; i < existing_scores; i++) {
+            j = fread(scores[i].name, 1, NAMELEN, handle);
+            if (j < 1 || strchr(scores[i].name, '\0') == NULL) {
+                fclose(handle);
+                fprintf(stderr, "Corrupted file. Starting fresh.\n");
+                createscores(score);
+                return;
+            }
+            fread(&scores[i].score, sizeof(int), 1, handle);
+            fread(&scores[i].timestamp, sizeof(time_t), 1, handle);
+        }
+
+        fclose(handle);
+    } else {
+        // No existing file
+        scoressize = 1;
+        scores = malloc(sizeof(score_t));
+    }
+
+    // Add new score
     strncpy(scores[scoressize - 1].name, playername, NAMELEN - 1);
-    scores[scoressize - 1].name[NAMELEN - 1] = '\0'; // Garantir la terminaison par caractère nul
+    scores[scoressize - 1].name[NAMELEN - 1] = '\0';
     scores[scoressize - 1].score = score;
-    scores[scoressize - 1].timestamp = time(NULL);
-     
-   if ((handle = fopen (scorefile,"w")) == NULL) err2 ();
-   for (i = 0; i < scoressize; i++)
-     {
-        j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
-        if (j != 1) err2 ();
-        j = fwrite (&(scores[i].score),sizeof (int),1,handle);
-        if (j != 1) err2 ();
-        j = fwrite (&(scores[i].timestamp),sizeof (time_t),1,handle);
-        if (j != 1) err2 ();
-     }
-   fclose (handle);
+    scores[scoressize - 1].timestamp = newtime;
 
-   fprintf (stderr,"%s",scoretitle);
-   i = 0;
-   while ((i < scoressize) && (scores[i].score != -1))
-     {
-        j = scores[i].timestamp == tmp ? '*' : ' ';
-        fprintf (stderr,"\t %2d%c %7d        %s\n",i + 1,j,scores[i].score,scores[i].name);
-        i++;
-     }
-   fprintf (stderr,"\n");
+    // Write everything back
+    handle = fopen(scorefile, "wb");
+    if (!handle) err2();
 
-   /* LOG */
-   get_timestamp_string(timestamp_str, sizeof(timestamp_str));
-   fprintf(logfile, "%s ~~ FINAL SCORE ~~\n", timestamp_str);
-   fprintf(logfile, "%s Player name = %s\n", timestamp_str, scores[TOP_SCORES
-   - 1].name);
-   fprintf(logfile, "%s Player score = %7d\n", timestamp_str, scores[TOP_SCORES
-   - 1].score);
-   fprintf(logfile, "%s Player timestamp = %ld\n", timestamp_str, scores[TOP_SCORES
-   - 1].timestamp);
-   fprintf(logfile, "%s ~~~~~~~~~~~~~~~~\n", timestamp_str);
+    for (i = 0; i < scoressize; i++) {
+        fwrite(scores[i].name, strlen(scores[i].name) + 1, 1, handle);
+        fwrite(&scores[i].score, sizeof(int), 1, handle);
+        fwrite(&scores[i].timestamp, sizeof(time_t), 1, handle);
+    }
 
-   }
+    fclose(handle);
 
-   free(scores);
-   scores = NULL;
+    // Show the list
+    fprintf(stderr, "%s", scoretitle);
+    for (i = 0; i < scoressize; i++) {
+        char mark = (scores[i].timestamp == newtime) ? '*' : ' ';
+        fprintf(stderr, "\t%2d%c %7d        %s\n", i + 1, mark, scores[i].score, scores[i].name);
+    }
+    fprintf(stderr, "\n");
+
+    // Log
+    get_timestamp_string(timestamp_str, sizeof(timestamp_str));
+    fprintf(logfile, "%s ~~ FINAL SCORE ~~\n", timestamp_str);
+    fprintf(logfile, "%s Player name = %s\n", timestamp_str, playername);
+    fprintf(logfile, "%s Player score = %7d\n", timestamp_str, score);
+    fprintf(logfile, "%s Player timestamp = %ld\n", timestamp_str, newtime);
+    fprintf(logfile, "%s ~~~~~~~~~~~~~~~~\n", timestamp_str);
+
+    free(scores);
 }
+
+void show_top_scores() {
+    FILE *handle;
+    int i = 0, j = 0, ch;
+    long filesize;
+    int entry_size = NAMELEN + sizeof(int) + sizeof(time_t);
+    score_t *scores = NULL;
+    int total_scores = 0;
+
+    handle = fopen(scorefile, "rb");
+    if (!handle) {
+        fprintf(stderr, "Aucun fichier de scores trouvé.\n");
+        return;
+    }
+
+    fseek(handle, 0, SEEK_END);
+    filesize = ftell(handle);
+    rewind(handle);
+
+    total_scores = filesize / entry_size;
+    if (total_scores == 0) {
+        fprintf(stderr, "Fichier de scores vide.\n");
+        fclose(handle);
+        return;
+    }
+
+    scores = malloc(total_scores * sizeof(score_t));
+    if (!scores) {
+        fprintf(stderr, "Erreur d'allocation mémoire.\n");
+        fclose(handle);
+        return;
+    }
+
+    for (i = 0; i < total_scores; i++) {
+        j = 0;
+        while ((ch = fgetc(handle)) != '\0') {
+            if ((ch == EOF) || (j >= NAMELEN - 1)) {
+                fprintf(stderr, "Fichier corrompu.\n");
+                free(scores);
+                fclose(handle);
+                return;
+            }
+            scores[i].name[j++] = (char) ch;
+        }
+        scores[i].name[j] = '\0';
+        fread(&scores[i].score, sizeof(int), 1, handle);
+        fread(&scores[i].timestamp, sizeof(time_t), 1, handle);
+    }
+
+    fclose(handle);
+
+    qsort(scores, total_scores, sizeof(score_t), cmpscores);
+
+    int top = total_scores < 10 ? total_scores : 10;
+    fprintf(stderr, "\n==== TOP %d SCORES ====\n", top);
+    for (i = 0; i < top; i++) {
+        fprintf(stderr, "%2d. %7d pts  -  %s\n", i + 1, scores[i].score, scores[i].name);
+    }
+    fprintf(stderr, "=======================\n\n");
+
+    free(scores);
+}
+
+
+
 
           /***************************************************************************/
           /***************************************************************************/
@@ -913,6 +922,7 @@ int main (int argc,char *argv[])
 	 {
 		showplayerstats (&engine);
 		savescores (GETSCORE (engine.score));
+    show_top_scores();
 	 }
    closelogfile();
    exit (EXIT_SUCCESS);
