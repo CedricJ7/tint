@@ -437,51 +437,31 @@ void showplayerstats (engine_t *engine)
 
 static void createscores(int score)
 {
+    FILE *handle;
+    score_t entry;
+
     if (score == 0) return;
 
-    if (scoressize <= 0) scoressize = TOP_SCORES;
-
-    FILE *handle;
-    int i;
-    score_t *scores = malloc(scoressize * sizeof(score_t));
-    if (!scores) {
-        fprintf(stderr, "Erreur allocation mémoire\n");
-        exit(1);
-    }
-
-    // Initialize all entries with default values
-    for (i = 0; i < scoressize; i++) {
-        strncpy(scores[i].name, "None", NAMELEN);
-        scores[i].name[NAMELEN - 1] = '\0';
-        scores[i].score = -1;
-        scores[i].timestamp = 0;
-    }
-
-    // Put the current score in the first slot (or wherever you want)
-    strncpy(scores[0].name, playername, NAMELEN - 1);
-    scores[0].name[NAMELEN - 1] = '\0';
-    scores[0].score = score;
-    scores[0].timestamp = time(NULL);
-
-    // Save to file
-    if ((handle = fopen(scorefile, "w")) == NULL) {
+    handle = fopen(scorefile, "wb");
+    if (!handle) {
         err1();
     }
 
-    for (i = 0; i < scoressize; i++) {
-        if (fwrite(scores[i].name, strlen(scores[i].name) + 1, 1, handle) != 1) err2();
-        if (fwrite(&scores[i].score, sizeof(int), 1, handle) != 1) err2();
-        if (fwrite(&scores[i].timestamp, sizeof(time_t), 1, handle) != 1) err2();
-    }
+    strncpy(entry.name, playername, NAMELEN - 1);
+    entry.name[NAMELEN - 1] = '\0';
+    entry.score = score;
+    entry.timestamp = time(NULL);
+
+    if (fwrite(entry.name, strlen(entry.name) + 1, 1, handle) != 1) err2();
+    if (fwrite(&entry.score, sizeof(int), 1, handle) != 1) err2();
+    if (fwrite(&entry.timestamp, sizeof(time_t), 1, handle) != 1) err2();
 
     fclose(handle);
 
-    // Print the new score (from index 0)
     fprintf(stderr, "%s", scoretitle);
-    fprintf(stderr, "\t  1* %7d        %s\n\n", score, scores[0].name);
-
-    free(scores);
+    fprintf(stderr, "\t  1* %7d        %s\n\n", score, entry.name);
 }
+
 
 
 static int cmpscores (const void *a,const void *b)
@@ -583,6 +563,7 @@ static void savescores(int score)
     fprintf(logfile, "%s ~~~~~~~~~~~~~~~~\n", timestamp_str);
 
     free(scores);
+    scores = NULL;
 }
 
 void show_top_scores() {
