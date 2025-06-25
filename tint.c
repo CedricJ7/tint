@@ -435,6 +435,52 @@ void showplayerstats (engine_t *engine)
 			GETSCORE (engine->score),engine->status.efficiency,GETSCORE (engine->score) / getsum ());
 }
 
+tatic void createscores (int score)
+{
+   FILE *handle;
+   int i,j;
+   
+   // Vérification que scoressize est valide
+   if (scoressize <= 0) scoressize = TOP_SCORES;
+   
+   score_t *scores = malloc(scoressize * sizeof(score_t));
+   if (!scores) { fprintf(stderr, "Erreur allocation mémoire\n"); exit(1); }
+   if (score == 0) return;	/* No need saving this */
+   for (i = 1; i < scoressize; i++)
+     {
+        strcpy (scores[i].name,"None");
+        scores[i].score = -1;
+        scores[i].timestamp = 0;
+     }
+   // Utiliser le nom déjà saisi au lieu de le redemander
+   if (scoressize > 0) 
+   {
+      strncpy(scores[scoressize - 1].name, playername, NAMELEN - 1);
+      scores[scoressize - 1].name[NAMELEN - 1] = '\0'; // Assurer la terminaison par caractère nul
+      scores[scoressize - 1].score = score;
+      scores[scoressize - 1].timestamp = time(NULL);
+
+   if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
+   for (i = 0; i < scoressize; i++)
+     {
+        j = fwrite (scores[i].name,strlen (scores[i].name) + 1,1,handle);
+        if (j != 1) err2 ();
+        j = fwrite (&(scores[i].score),sizeof (int),1,handle);
+        if (j != 1) err2 ();
+        j = fwrite (&(scores[i].timestamp),sizeof (time_t),1,handle);
+        if (j != 1) err2 ();
+     }
+   fclose (handle);
+   }
+   fprintf (stderr,"%s",scoretitle);
+   fprintf (stderr,"\t  1* %7d        %s\n\n",score,scores[0].name);
+  
+   scoressize ++;
+   
+   free(scores);
+   scores = NULL;
+}
+
 static int cmpscores (const void *a,const void *b)
 {
    int result;
